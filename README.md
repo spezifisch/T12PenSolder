@@ -6,7 +6,7 @@ Development WIP in `./test_fw`.
 
 ## Board Info
 
-!(./layout.jpg)
+![](./layout.jpg)
 
 Label on case: T12
 
