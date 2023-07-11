@@ -1,0 +1,41 @@
+{
+  "build": {
+    "cpu": "cortex-m0",
+    "extra_flags": "-DSTM32F030x6",
+    "f_cpu": "48000000L",
+    "mcu": "stm32f030f6p6",
+    "product_line": "STM32F030x6",
+    "variant": "T12F030"
+  },
+  "debug": {
+    "default_tools": [
+      "stlink"
+    ],
+    "jlink_device": "STM32F030F4",
+    "onboard_tools": [
+      "stlink"
+    ],
+    "openocd_target": "stm32f0x",
+    "svd_path": "STM32F030.svd"
+  },
+  "frameworks": [
+    "arduino",
+    "cmsis",
+    "stm32cube",
+    "libopencm3"
+  ],
+  "name": "T12 F030 Soldering Iron",
+  "upload": {
+    "maximum_ram_size": 2784,
+    "maximum_size": 32768,
+    "protocol": "stlink",
+    "protocols": [
+      "jlink",
+      "cmsis-dap",
+      "stlink",
+      "blackmagic"
+    ]
+  },
+  "url": "http://www.st.com/en/evaluation-tools/32f0308discovery.html",
+  "vendor": "ST"
+}
