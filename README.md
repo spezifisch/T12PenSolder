@@ -1,12 +1,34 @@
 # T12 clone reverse engineering and replacement firmware
 
+"I should have just bought a [Pinecil](https://wiki.pine64.org/wiki/Pinecil)."
+
 ## Replacement Firmware
 
-Development WIP in `./test_fw`.
+Development WIP in [./test_fw](./test_fw).
 
-## Board Info
+![](./fwdisplay.jpg)
+
+Current state:
+
+- all buttons work
+- voltage measurement of soldering tip temperature and VBUS (from USB-PD) work
+- heating on/off works (not yet regulated)
+- display output very hacky and slow
+- no coordination between tip heating PWM and tip measurement, no temperature calculation yet
+
+## "Pen Solder V3" Description
+
+Its name is: *Portable T12 Electric Soldering Iron PD 65W DC 72W*. (T12 is just the name of this ubiquitous soldering tip though. Therefore I'm calling it by the label on its PCB.)
+
+![](./ali_product.jpg)
+
+I [expected an STC8 uC](https://github.com/atc1441/ATC_stc_solder_iron) but got an STM32F030 clone instead. Which is arguably better.
 
 ![](./layout.jpg)
+
+[Schematic](./pen_solder_v3.pdf)
+
+## Board Info
 
 Label on case: T12
 
