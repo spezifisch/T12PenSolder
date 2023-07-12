@@ -36,9 +36,9 @@ void setup()
   bbi2c.bWire = false;
   bbi2c.iSDA = SDA_PIN;
   bbi2c.iSCL = SCL_PIN;
-  I2CInit(&bbi2c, 100000L);
+  I2CInit(&bbi2c, 1000000L);
 
-  if (false)
+  if (true)
   {
     // stock firmware does what looks like a display reset, but it isn't connected
     digitalWrite(PA9, 0);
@@ -46,7 +46,7 @@ void setup()
     digitalWrite(PA9, 1);
   } else {
     // for some reason the display needs a bit of delay to turn of reliably
-    delay(10);
+    delay(200);
   }
 
   oled.begin(&SolderingIron128x64, &bbi2c, 0x3c);

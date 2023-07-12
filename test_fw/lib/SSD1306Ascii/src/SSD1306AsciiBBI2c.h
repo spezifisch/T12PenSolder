@@ -57,18 +57,19 @@ class SSD1306AsciiBBI2c : public SSD1306Ascii {
 
  protected:
   void writeDisplay(uint8_t b, uint8_t mode) {
-    uint8_t buf[2] = {
-      0,
-      b,
-    };
-    if (mode != SSD1306_MODE_CMD) {
-      buf[0] = 0x40;
+    if ((m_nData && mode == SSD1306_MODE_CMD)) {
+      I2CStop(bbi2c);
+      m_nData = 0;
     }
-    I2CWrite(bbi2c, m_i2cAddr, buf, 2);
-
+    if (m_nData == 0) {
+      I2CStart(bbi2c, m_i2cAddr, 0);
+      I2CSendByte(bbi2c, mode == SSD1306_MODE_CMD ? 0X00 : 0X40);
+    }
+    I2CSendByte(bbi2c, b);
     if (mode == SSD1306_MODE_RAM_BUF) {
       m_nData++;
     } else {
+      I2CStop(bbi2c);
       m_nData = 0;
     }
   }

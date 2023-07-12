@@ -13,7 +13,7 @@ Current state:
 - all buttons work
 - voltage measurement of soldering tip temperature and VBUS (from USB-PD) work
 - heating on/off works (not yet regulated)
-- display output very hacky and slow
+- display output works (using text only library)
 - no coordination between tip heating PWM and tip measurement, no temperature calculation yet
 
 ## "Pen Solder V3" Description
