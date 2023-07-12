@@ -32,11 +32,10 @@ void setup()
   digitalWrite(TIPHEAT_DRV, 0);
 
   // display init
-  memset(&bbi2c, 0, sizeof(bbi2c));
-  bbi2c.bWire = false;
   bbi2c.iSDA = SDA_PIN;
   bbi2c.iSCL = SCL_PIN;
-  I2CInit(&bbi2c, 1000000L);
+  bbi2c.iDelay = 0;
+  I2CInit(&bbi2c);
 
   if (true)
   {

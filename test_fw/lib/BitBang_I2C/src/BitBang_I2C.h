@@ -20,53 +20,53 @@
 #ifndef __BITBANG_I2C__
 #define __BITBANG_I2C__
 
-// On Linux, use it as C code, not C++
-#if !defined(ARDUINO) && defined(__cplusplus)
-extern "C" {
-#endif
-
 typedef struct mybbi2c
 {
-uint8_t iSDA, iSCL; // pin numbers (0xff = disabled)
-uint8_t bWire, bAlign; // use the Wire library
-uint8_t iSDABit, iSCLBit; // bit numbers of the ports
-uint32_t iDelay;
-#ifdef _LINUX_
-int file_i2c;
-int iBus;
-#else
-volatile uint32_t *pSDADDR, *pSDAPORT; // data direction and port register addr
-volatile uint32_t *pSCLDDR, *pSCLPORT;
-#endif
+    // pin numbers used for SDA and SCL
+    // Note that you need to configure the pins before calling I2CInit()
+    uint8_t iSDA, iSCL;
+
+    // set the desired clock period / 2,
+    // e.g. 100 kHz -> 10 us / 2 -> iDelay_us = 5
+    uint32_t iDelay;
 } BBI2C;
+
 //
-// Read N bytes
+// Initialize the I2C BitBang library
+// Note that you need to configure the pins before calling this (output, open-drain)
+//
+void I2CInit(BBI2C *pI2C);
+
+//
+// Transaction mode: Read N bytes
 //
 int I2CRead(BBI2C *pI2C, uint8_t iAddr, uint8_t *pData, int iLen);
+
 //
-// Read N bytes starting at a specific I2C internal register
+// Transaction mode: Read N bytes starting at a specific I2C internal register
 //
 int I2CReadRegister(BBI2C *pI2C, uint8_t iAddr, uint8_t u8Register, uint8_t *pData, int iLen);
+
 //
-// Write I2C data
+// Transaction mode: Write I2C data
 // quits if a NACK is received and returns 0
 // otherwise returns the number of bytes written
 //
 int I2CWrite(BBI2C *pI2C, uint8_t iAddr, uint8_t *pData, int iLen);
-//
-// Initialize the I2C BitBang library
-// Pass the pin numbers used for SDA and SCL
-// as well as the clock rate in Hz
-//
-void I2CInit(BBI2C *pI2C, uint32_t iClock);
 
-void I2CStop(BBI2C *pI2C);
+//
+// Manual mode: Send start condition and address byte
+//
 void I2CStart(BBI2C *pI2C, uint8_t iAddr, uint8_t bRead);
+
+//
+// Manual mode: Send single byte
+//
 void I2CSendByte(BBI2C *pI2C, uint8_t iByte);
 
-#if !defined(ARDUINO) && defined(__cplusplus)
-}
-#endif
+//
+// Manual mode: Send stop condition
+//
+void I2CStop(BBI2C *pI2C);
 
 #endif //__BITBANG_I2C__
-
