@@ -1,9 +1,7 @@
 #include <Arduino.h>
-#include <BitBang_I2C.h>
+#include <U8g2lib.h>
 
 #include "cube_init.h"
-#include "SSD1306Ascii.h"
-#include "SSD1306AsciiBBI2c.h"
 
 // i2c bitbanged
 static constexpr int SDA_PIN = PA7;
@@ -18,76 +16,102 @@ static constexpr int TIPHEAT_DRV = PA3;
 static constexpr int VIN_MEAS = PA1;
 static constexpr int TIPTEMP_MEAS = PA2;
 
-BBI2C bbi2c;
-SSD1306AsciiBBI2c oled;
+U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C u8g2(U8G2_R0, /* clock=*/SCL_PIN, /* data=*/SDA_PIN, /* reset=*/U8X8_PIN_NONE);
 
 void setup()
 {
+  // lowlevel stm32cube setup
   MX_GPIO_Init();
-  MX_ADC_Init();
 
+  // adc setup
+  pinMode(VIN_MEAS, INPUT_ANALOG);
+  pinMode(TIPTEMP_MEAS, INPUT_ANALOG);
   analogReadResolution(12);
+  MX_ADC_Config();
 
   // turn heat off
   digitalWrite(TIPHEAT_DRV, 0);
 
-  // display init
-  bbi2c.iSDA = SDA_PIN;
-  bbi2c.iSCL = SCL_PIN;
-  bbi2c.iDelay = 0;
-  I2CInit(&bbi2c);
+  // stock firmware does what looks like a display reset, but it isn't connected on my board
+  digitalWrite(PA9, 0);
+  delay(200);
+  digitalWrite(PA9, 1);
+  delay(200);
 
-  if (true)
+  u8g2.begin();
+  u8g2.setFont(u8g2_font_5x8_mr);
+
+  // splash screen
+  u8g2.firstPage();
+  do
   {
-    // stock firmware does what looks like a display reset, but it isn't connected
-    digitalWrite(PA9, 0);
-    delay(200);
-    digitalWrite(PA9, 1);
-  } else {
-    // for some reason the display needs a bit of delay to turn of reliably
-    delay(200);
-  }
-
-  oled.begin(&SolderingIron128x64, &bbi2c, 0x3c);
+    u8g2.drawButtonUTF8(u8g2.getDisplayWidth() / 2, u8g2.getDisplayHeight() / 2, U8G2_BTN_HCENTER | U8G2_BTN_BW1, 0, 2, 2, "PEN SOLDER V3");
+  } while (u8g2.nextPage());
+  delay(1000);
 }
 
-void loop()
+void loop(void)
 {
-  oled.setFont(Adafruit5x7);
+  static uint32_t last_showtime = 0;
+  static char tmp[64];
 
-  uint32_t m = micros();
+  const uint32_t vin = analogRead(VIN_MEAS);
+  const uint32_t tiptemp = analogRead(TIPTEMP_MEAS);
 
-  oled.clear();
+  const uint32_t vin_mv = vin * 3300 / 4096 * 110000 / 10000; // 3.3V ADC ref., 12 bit ADC, compensate for 1/11 voltage divider
+  const uint32_t tt_uv = tiptemp * 3300 / 4096 * 1000 / 221;  // ... to uV, 221x gain from OpAmp
 
-  // first row
-  if (digitalRead(BUT_SET)) {
-    oled.print("(SET)");
-  } else {
-    oled.print(" SET ");
-  }
-  if (digitalRead(BUT_MINUS)) {
-    oled.print("(-)");
-  } else {
-    oled.print(" - ");
-  }
-  if (digitalRead(BUT_PLUS)) {
-    oled.print("(+)");
-  } else {
-    oled.print(" + ");
-  }
-  oled.println();
-  
-  // second row
-  uint32_t vin = analogRead(VIN_MEAS);
-  uint32_t tiptemp = analogRead(TIPTEMP_MEAS);
-  uint32_t vin_mv = vin * 3300 / 4096 * 110000 / 10000; // 3.3V ADC ref., 12 bit ADC, compensate for 1/11 voltage divider
-  uint32_t tt_uv = tiptemp * 3300 / 4096 * 1000 / 221; // ... to uV, 221x gain from OpAmp
-  oled.printf("vin: %04d %7d mV\n", vin, vin_mv);
-  oled.printf("tip: %04d %7d uV\n", tiptemp, tt_uv);
+  const bool buttonSet = digitalRead(BUT_SET);
+  const bool buttonMinus = digitalRead(BUT_MINUS);
+  const bool buttonPlus = digitalRead(BUT_PLUS);
 
-  // third row
-  oled.print("micros: ");
-  oled.print(micros() - m);
+  const uint32_t start = micros();
+  u8g2.firstPage();
+  do
+  {
+    // first row
+    u8g2.setCursor(0, 8);
+    if (buttonSet)
+    {
+      u8g2.print("(SET)");
+    }
+    else
+    {
+      u8g2.print(" SET ");
+    }
+    if (buttonMinus)
+    {
+      u8g2.print("(-)");
+    }
+    else
+    {
+      u8g2.print(" - ");
+    }
+    if (buttonPlus)
+    {
+      u8g2.print("(+)");
+    }
+    else
+    {
+      u8g2.print(" + ");
+    }
 
-  delay(1000);
+    // second row
+    u8g2.setCursor(0, 16);
+    snprintf(tmp, sizeof(tmp), "vin: %04d %7d mV", vin, vin_mv);
+    u8g2.print(tmp);
+
+    // third row
+    u8g2.setCursor(0, 24);
+    snprintf(tmp, sizeof(tmp), "tip: %04d %7d uV", tiptemp, tt_uv);
+    u8g2.print(tmp);
+
+    // 4th row
+    u8g2.setCursor(0, 32);
+    u8g2.print("micros: ");
+    u8g2.print(last_showtime);
+  } while (u8g2.nextPage());
+
+  last_showtime = micros() - start;
+  delay(100);
 }

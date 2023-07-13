@@ -26,7 +26,7 @@
   ],
   "name": "T12 F030 Soldering Iron",
   "upload": {
-    "maximum_ram_size": 2784,
+    "maximum_ram_size": 4096,
     "maximum_size": 32768,
     "protocol": "stlink",
     "protocols": [

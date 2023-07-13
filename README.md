@@ -12,9 +12,10 @@ Current state:
 
 - all buttons work
 - voltage measurement of soldering tip temperature and VBUS (from USB-PD) work
+- display output works (it's connected to non-hardware-I2C pins, so we're bitbanging with [U8g2](https://github.com/olikraus/u8g2) with custom STM32 optimizations for around 170kHz I2C clock speed)
 - heating on/off works (not yet regulated)
-- display output works (using text only library)
 - no coordination between tip heating PWM and tip measurement, no temperature calculation yet
+- resource usage: around 20/32kB flash, 1.4/4kB RAM
 
 ## "Pen Solder V3" Description
 
