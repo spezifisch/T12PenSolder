@@ -2,6 +2,7 @@
 #include <U8g2lib.h>
 
 #include "cube_init.h"
+#include "ironos_hakko.h"
 #include "ironos_pid.h"
 
 // i2c bitbanged
@@ -17,19 +18,17 @@ static constexpr int TIPHEAT_DRV = PA3;
 static constexpr int VIN_MEAS = PA1;
 static constexpr int TIPTEMP_MEAS = PA2;
 
-static constexpr bool HEAT_ARMED = true;
+// display
+U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C u8g2(U8G2_R0, /* clock=*/SCL_PIN, /* data=*/SDA_PIN, /* reset=*/U8X8_PIN_NONE);
+
+// default settings
+static constexpr uint32_t DEFAULT_TEMPERATURE_degC = 320;
 
 // an STM32 timer with 3+ channels
 HardwareTimer *TipHeatTimer;
-
 static constexpr uint32_t THTSwitchChannel = 1;
 static constexpr uint32_t THTMeasureChannel = 2;
 static constexpr uint32_t THTControllerChannel = 3;
-
-// HACK just for comparison
-uint32_t IronOS_convertuVToDegC(uint32_t tipuVDelta);
-
-U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C u8g2(U8G2_R0, /* clock=*/SCL_PIN, /* data=*/SDA_PIN, /* reset=*/U8X8_PIN_NONE);
 
 class SolderingTip
 {
@@ -103,12 +102,13 @@ public:
     tipTemp_uV = constrain(tipTemp_raw * 3300 / 4095 * 1000 / 221, 0, 15000); // ... to uV, 221x gain from OpAmp
 
     // convert to °C
-    tipTemp_degCX1000 = tipTemp_raw * 204 - 73840;
+    tipTemp_degC = IronOS::convertuVToDegC(tipTemp_uV); // IronOS curve
+    // tipTemp_degC = (tipTemp_raw * 204 - 73840) / 1000; // custom curve
   }
 
   void pwmPIDControllerCallback()
   {
-    // PID, largely ripped from IronOS
+    // PID controller or rather I², largely ripped from IronOS' PIDThread
     const uint32_t now = millis();
 
     const uint32_t deltaT_ms = now - lastPIDTime;
@@ -118,33 +118,36 @@ public:
       targetTemperature_degC = 0;
       return;
     }
-    const uint32_t rate = 1000 / deltaT_ms;
+    const uint32_t rate_Hz = 1000 / deltaT_ms;
     lastPIDTime = now;
 
-    if (!pidRunning)
+    if (!pidRunning || init)
     {
-      // disabled by UI
+      // disabled by UI or first call
+      init = false;
       return;
     }
-    init = false;
 
-    int32_t error_K = targetTemperature_degC - getTipTempDegC();
+    // PID input
+    int32_t error_K = targetTemperature_degC - tipTemp_degC;
 
+    // calculate PID output
     int32_t outputX10Watts = powerStore.update(TIP_THERMAL_MASS * error_K, // the required power
                                                TIP_THERMAL_MASS,           // Inertia, smaller numbers increase dominance of the previous value
                                                2,                          // gain
-                                               rate,                       // PID cycle frequency
+                                               rate_Hz,                    // PID cycle frequency
                                                HARDWARE_MAX_WATTAGE_X10);
 
     // output
     if (outputX10Watts > 0)
     {
-      const uint32_t v = getVinmV() / 100;
-      uint32_t availableWattsX10 = (v * v) / TIP_RESISTANCE_X10OHM;
+      const uint32_t vinX10 = getVinmV() / 100;
+      uint32_t availableWattsX10 = (vinX10 * vinX10) / TIP_RESISTANCE_X10OHM;
       availableWattsX10 = availableWattsX10 * MAX_DUTY_PERCENT;
       availableWattsX10 /= 100;
 
       uint32_t newDuty = (MAX_DUTY_PERCENT * outputX10Watts) / availableWattsX10;
+      // sanity check: don't exceed it because we need time for measurement
       pwmDutyPercent = constrain(newDuty, 0, MAX_DUTY_PERCENT);
 
       outputWatts = (pwmDutyPercent * availableWattsX10) / MAX_DUTY_PERCENT / 10;
@@ -169,7 +172,7 @@ public:
 
   int getTipTempDegC()
   {
-    return tipTemp_degCX1000 / 1000;
+    return tipTemp_degC;
   }
 
   unsigned getVinRaw()
@@ -210,7 +213,7 @@ protected:
   // measurements
   uint32_t tipTemp_raw = 0;
   uint32_t tipTemp_uV = 0;
-  int32_t tipTemp_degCX1000 = 0;
+  int32_t tipTemp_degC = 0;
 
   uint32_t vin_raw = 0;
   int32_t vin_mV = 0;
@@ -225,9 +228,9 @@ protected:
 
   bool init = true;
 
-  static constexpr uint32_t TIP_RESISTANCE_X10OHM = 80; // 8.3 Ohm measured
-  static constexpr uint32_t HARDWARE_MAX_WATTAGE_X10 = 650;
-  static constexpr uint32_t TIP_THERMAL_MASS = 65; // X10 watts to raise 1 deg C in 1 second
+  static constexpr uint32_t TIP_RESISTANCE_X10OHM = 80;     // 8.3 Ohm measured with multimeter
+  static constexpr uint32_t HARDWARE_MAX_WATTAGE_X10 = 650; // according to advertising
+  static constexpr uint32_t TIP_THERMAL_MASS = 65;          // X10 watts to raise 1 deg C in 1 second
 };
 SolderingTip solderingTip;
 
@@ -263,10 +266,10 @@ void setup()
   solderingTip.safeMode();
 
   // stock firmware does what looks like a display reset, but it isn't connected on my board
-  digitalWrite(PA9, 0);
-  delay(200);
-  digitalWrite(PA9, 1);
-  delay(200);
+  // digitalWrite(PA9, 0);
+  // delay(200);
+  // digitalWrite(PA9, 1);
+  delay(500);
 
   // adc setup
   pinMode(VIN_MEAS, INPUT_ANALOG);
@@ -312,8 +315,8 @@ void loop(void)
   static constexpr uint32_t BUTTON_DEBOUNCE_COUNT = 2;                                          // button state must be stable for this many display updates
   static uint32_t buttonSetPressCount = 0, buttonMinusPressCount = 0, buttonPlusPressCount = 0; // debounce counters
 
-  static bool heatOn = false;                     // soldering tip enabled
-  static uint32_t selectedTemperature_degC = 320; // target temp., change with -/+
+  static bool heatOn = false;                                          // soldering tip enabled
+  static uint32_t selectedTemperature_degC = DEFAULT_TEMPERATURE_degC; // target temp., change with -/+
 
   static char tmp[64];
 
@@ -404,9 +407,9 @@ void loop(void)
   const uint32_t vin_raw = solderingTip.getVinRaw();
   const uint32_t vin_mv = solderingTip.getVinmV();
 
-  const int32_t tt_raw = solderingTip.getTipTempRaw();
+  const uint32_t tt_raw = solderingTip.getTipTempRaw();
+  const uint32_t tt_mv = solderingTip.getTipTempuV() / 1000;
   const int32_t tt_degC = solderingTip.getTipTempDegC();
-  const uint32_t tt_iosDegC = IronOS_convertuVToDegC(solderingTip.getTipTempuV());
 
   const int32_t t_pwm = solderingTip.getPWM();
   const int32_t t_outputWatts = solderingTip.getOutputWatts();
@@ -423,26 +426,34 @@ void loop(void)
     u8g2.print(tmp);
 
     u8g2.setCursor(0, 16);
-    snprintf(tmp, sizeof(tmp), "Tip:%2dW Du%2d%% Tgt%3dC L%2d", t_outputWatts, t_pwm, selectedTemperature_degC, last_showtime / 1000);
+    snprintf(tmp, sizeof(tmp), "Tip:%04d %2dmV D%2d%%L%2dB%d%d%d", tt_raw, tt_mv, t_pwm, last_showtime / 1000, buttonSet, buttonMinus, buttonPlus);
     u8g2.print(tmp);
 
-    // third row
-    u8g2.setCursor(0, 24);
-    u8g2.print(heatOn ? "ON!" : "off");
+    // 3rd row
+    u8g2.setCursor(45, 24);
+    u8g2.print("Target");
 
     // 4th row
-    u8g2.setCursor(0, 32);
-    snprintf(tmp, sizeof(tmp), "IOS%03d", tt_iosDegC);
+    u8g2.setCursor(45, 32);
+    snprintf(tmp, sizeof(tmp), "%3dC", selectedTemperature_degC);
     u8g2.print(tmp);
+
+    // big
+    u8g2.setCursor(0, 32);
+    u8g2.setFont(u8g2_font_spleen12x24_mf);
+    if (heatOn)
+    {
+      snprintf(tmp, sizeof(tmp), "%2dW", t_outputWatts);
+      u8g2.print(tmp);
+    }
+    else
+    {
+      u8g2.print("OFF");
+    }
 
     //
-    u8g2.setFont(u8g2_font_7x14B_mf);
-    u8g2.setCursor(48, 30);
+    u8g2.setCursor(80, 32);
     snprintf(tmp, sizeof(tmp), "%3dC", tt_degC);
-    u8g2.print(tmp);
-
-    u8g2.setCursor(96, 30);
-    snprintf(tmp, sizeof(tmp), "%04d", tt_raw);
     u8g2.print(tmp);
   } while (u8g2.nextPage());
 
