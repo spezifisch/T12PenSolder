@@ -15,6 +15,8 @@
 #include "pins_arduino.h"
 #include "cube_init.h"
 
+TIM_HandleTypeDef htim17;
+
 /**
   * @brief ADC Config Function
   * @param None

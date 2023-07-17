@@ -48,22 +48,6 @@ WEAK const PinMap PinMap_ADC[] = {
 
 //*** No DAC ***
 
-//*** I2C ***
-
-#ifdef HAL_I2C_MODULE_ENABLED
-WEAK const PinMap PinMap_I2C_SDA[] = {
-  {PA_10, I2C1, STM_PIN_DATA(STM_MODE_AF_OD, GPIO_NOPULL, GPIO_AF4_I2C1)},
-  {NC,    NP,   0}
-};
-#endif
-
-#ifdef HAL_I2C_MODULE_ENABLED
-WEAK const PinMap PinMap_I2C_SCL[] = {
-  {PA_9, I2C1, STM_PIN_DATA(STM_MODE_AF_OD, GPIO_NOPULL, GPIO_AF4_I2C1)},
-  {NC,   NP,   0}
-};
-#endif
-
 //*** TIM ***
 
 #ifdef HAL_TIM_MODULE_ENABLED
