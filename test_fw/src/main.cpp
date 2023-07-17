@@ -19,12 +19,14 @@ static constexpr int TIPTEMP_MEAS = PA2;
 
 static constexpr bool HEAT_ARMED = true;
 
+// an STM32 timer with 3+ channels
 HardwareTimer *TipHeatTimer;
+
 static constexpr uint32_t THTSwitchChannel = 1;
 static constexpr uint32_t THTMeasureChannel = 2;
 static constexpr uint32_t THTControllerChannel = 3;
 
-// HACK
+// HACK just for comparison
 uint32_t IronOS_convertuVToDegC(uint32_t tipuVDelta);
 
 U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C u8g2(U8G2_R0, /* clock=*/SCL_PIN, /* data=*/SDA_PIN, /* reset=*/U8X8_PIN_NONE);
@@ -40,7 +42,6 @@ public:
     targetTemperature_degC = 0;
     outputWatts = 0;
     pwmDutyPercent = 0;
-    powerX10 = 0;
     tipOff();
   }
 
@@ -136,15 +137,24 @@ public:
                                                HARDWARE_MAX_WATTAGE_X10);
 
     // output
-    const uint32_t v = getVinmV() / 100;
-    uint32_t availableWattsX10 = (v * v) / TIP_RESISTANCE_X10OHM;
-    availableWattsX10 = availableWattsX10 * MAX_DUTY_PERCENT;
-    availableWattsX10 /= 100;
+    if (outputX10Watts > 0)
+    {
+      const uint32_t v = getVinmV() / 100;
+      uint32_t availableWattsX10 = (v * v) / TIP_RESISTANCE_X10OHM;
+      availableWattsX10 = availableWattsX10 * MAX_DUTY_PERCENT;
+      availableWattsX10 /= 100;
 
-    uint32_t newDuty = (MAX_DUTY_PERCENT * outputX10Watts) / availableWattsX10;
-    pwmDutyPercent = constrain(newDuty, 0, MAX_DUTY_PERCENT);
+      uint32_t newDuty = (MAX_DUTY_PERCENT * outputX10Watts) / availableWattsX10;
+      pwmDutyPercent = constrain(newDuty, 0, MAX_DUTY_PERCENT);
 
-    outputWatts = (pwmDutyPercent * availableWattsX10) / MAX_DUTY_PERCENT;
+      outputWatts = (pwmDutyPercent * availableWattsX10) / MAX_DUTY_PERCENT / 10;
+    }
+    else
+    {
+      // we're too hot
+      pwmDutyPercent = 0;
+      outputWatts = 0;
+    }
   }
 
   unsigned getTipTempRaw()
@@ -194,9 +204,8 @@ protected:
   }
 
   // output
-  uint32_t powerX10 = 0;
   uint32_t pwmDutyPercent = 0;
-  static constexpr uint32_t MAX_DUTY_PERCENT = 50;
+  static constexpr uint32_t MAX_DUTY_PERCENT = 80;
 
   // measurements
   uint32_t tipTemp_raw = 0;
@@ -263,17 +272,17 @@ void setup()
   pinMode(VIN_MEAS, INPUT_ANALOG);
   pinMode(TIPTEMP_MEAS, INPUT_ANALOG);
   analogReadResolution(12);
-  // set sampling time
+  // set sampling time to same as stock firmware
   MX_ADC_Config();
 
   // configure PWM heater output
   TipHeatTimer = new HardwareTimer(TIM3);
-  TipHeatTimer->setOverflow(100000, MICROSEC_FORMAT);              // 100 ms
+  TipHeatTimer->setOverflow(100000, MICROSEC_FORMAT);              // 100 ms, 10 Hz
   TipHeatTimer->setMode(THTSwitchChannel, TIMER_DISABLED, -1);     // on compare cb: switch output off
   TipHeatTimer->setMode(THTMeasureChannel, TIMER_DISABLED, -1);    // measure tip temperature
   TipHeatTimer->setMode(THTControllerChannel, TIMER_DISABLED, -1); // update PID controller
   TipHeatTimer->setCaptureCompare(THTSwitchChannel, 0, PERCENT_COMPARE_FORMAT);
-  TipHeatTimer->setCaptureCompare(THTMeasureChannel, 10, PERCENT_COMPARE_FORMAT);    // always switch + 10%
+  TipHeatTimer->setCaptureCompare(THTMeasureChannel, 10, PERCENT_COMPARE_FORMAT);    // switch% + 10%
   TipHeatTimer->setCaptureCompare(THTControllerChannel, 90, PERCENT_COMPARE_FORMAT); // always after 90ms
   TipHeatTimer->attachInterrupt(Update_IT_callback);
   TipHeatTimer->attachInterrupt(THTSwitchChannel, Switch_callback);
@@ -296,22 +305,27 @@ void setup()
 
 void loop(void)
 {
-  static constexpr uint32_t update_period_ms = 100;
-  static constexpr uint32_t debounce_count = 2;
-  static uint32_t last_millis = update_period_ms * (millis() / update_period_ms);
-  static uint32_t last_showtime = 0;
-  static uint32_t buttonSetPressCount = 0, buttonMinusPressCount = 0, buttonPlusPressCount = 0;
-  static bool heatOn = false;
+  static constexpr uint32_t UPDATE_PERIOD_ms = 100;                               // display update period
+  static uint32_t last_millis = UPDATE_PERIOD_ms * (millis() / UPDATE_PERIOD_ms); // last display update
+  static uint32_t last_showtime = 0;                                              // last display buffer transfer duration
+
+  static constexpr uint32_t BUTTON_DEBOUNCE_COUNT = 2;                                          // button state must be stable for this many display updates
+  static uint32_t buttonSetPressCount = 0, buttonMinusPressCount = 0, buttonPlusPressCount = 0; // debounce counters
+
+  static bool heatOn = false;                     // soldering tip enabled
+  static uint32_t selectedTemperature_degC = 320; // target temp., change with -/+
+
   static char tmp[64];
 
-  // UI update?
+  // 10 Hz UI update
   const uint32_t now = millis();
-  if (now - last_millis < update_period_ms)
+  if (now - last_millis < UPDATE_PERIOD_ms)
   {
     return;
   }
-
   last_millis = now;
+
+  // loop benchmark
   const uint32_t start = micros();
 
   // read buttons
@@ -321,15 +335,15 @@ void loop(void)
 
   if (buttonSet)
   {
-    if (buttonSetPressCount < debounce_count)
+    if (buttonSetPressCount < BUTTON_DEBOUNCE_COUNT)
     {
       buttonSetPressCount++;
 
-      if (buttonSetPressCount == debounce_count)
+      if (buttonSetPressCount == BUTTON_DEBOUNCE_COUNT)
       {
         heatOn = !heatOn;
 
-        solderingTip.setTargetTemperature(heatOn ? 250 : 0);
+        solderingTip.setTargetTemperature(heatOn ? selectedTemperature_degC : 0);
       }
     }
   }
@@ -338,14 +352,61 @@ void loop(void)
     buttonSetPressCount = 0;
   }
 
+  if (buttonMinus)
+  {
+    if (buttonMinusPressCount < BUTTON_DEBOUNCE_COUNT)
+    {
+      buttonMinusPressCount++;
+
+      if (buttonMinusPressCount == BUTTON_DEBOUNCE_COUNT)
+      {
+        selectedTemperature_degC -= 10;
+        if (selectedTemperature_degC < 150)
+        {
+          selectedTemperature_degC = 150;
+        }
+
+        solderingTip.setTargetTemperature(heatOn ? selectedTemperature_degC : 0);
+        buttonMinusPressCount = 0; // repeat
+      }
+    }
+  }
+  else
+  {
+    buttonMinusPressCount = 0;
+  }
+
+  if (buttonPlus)
+  {
+    if (buttonPlusPressCount < BUTTON_DEBOUNCE_COUNT)
+    {
+      buttonPlusPressCount++;
+
+      if (buttonPlusPressCount == BUTTON_DEBOUNCE_COUNT)
+      {
+        selectedTemperature_degC += 10;
+        if (selectedTemperature_degC > 450)
+        {
+          selectedTemperature_degC = 450;
+        }
+
+        solderingTip.setTargetTemperature(heatOn ? selectedTemperature_degC : 0);
+        buttonPlusPressCount = 0; // repeat
+      }
+    }
+  }
+  else
+  {
+    buttonPlusPressCount = 0;
+  }
+
   // get tip state
   const uint32_t vin_raw = solderingTip.getVinRaw();
   const uint32_t vin_mv = solderingTip.getVinmV();
 
   const int32_t tt_raw = solderingTip.getTipTempRaw();
-  const uint32_t tt_uv = solderingTip.getTipTempuV();
   const int32_t tt_degC = solderingTip.getTipTempDegC();
-  const uint32_t tt_iosDegC = IronOS_convertuVToDegC(tt_uv);
+  const uint32_t tt_iosDegC = IronOS_convertuVToDegC(solderingTip.getTipTempuV());
 
   const int32_t t_pwm = solderingTip.getPWM();
   const int32_t t_outputWatts = solderingTip.getOutputWatts();
@@ -362,16 +423,16 @@ void loop(void)
     u8g2.print(tmp);
 
     u8g2.setCursor(0, 16);
-    snprintf(tmp, sizeof(tmp), "Tip:%02dW  %5duV L%3dB%d%d%d", t_outputWatts, tt_uv, last_showtime / 1000, buttonSet, buttonMinus, buttonPlus);
+    snprintf(tmp, sizeof(tmp), "Tip:%2dW Du%2d%% Tgt%3dC L%2d", t_outputWatts, t_pwm, selectedTemperature_degC, last_showtime / 1000);
     u8g2.print(tmp);
 
     // third row
     u8g2.setCursor(0, 24);
-    u8g2.print(heatOn ? "HEAT ON!" : "heat off");
+    u8g2.print(heatOn ? "ON!" : "off");
 
     // 4th row
     u8g2.setCursor(0, 32);
-    snprintf(tmp, sizeof(tmp), "%02d%%IOS%03d", t_pwm, tt_iosDegC);
+    snprintf(tmp, sizeof(tmp), "IOS%03d", tt_iosDegC);
     u8g2.print(tmp);
 
     //
