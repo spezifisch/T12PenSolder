@@ -28,7 +28,9 @@ static constexpr int BUT_MINUS = PA4;
 static constexpr int BUT_PLUS = PA5;
 static constexpr int BUT_SET = PB1;
 // heating output
-static constexpr int TIPHEAT_DRV = PA3;
+static constexpr int TIPHEAT_DRV = PA3; // arduino style
+#define TIPHEAT_GPIO (GPIOA)            // ST style
+static constexpr uint16_t TIPHEAT_PIN_MASK = GPIO_PIN_3;
 // adc inputs
 static constexpr int VIN_MEAS = PA1;
 static constexpr int TIPTEMP_MEAS = PA2;

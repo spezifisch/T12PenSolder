@@ -1,7 +1,7 @@
 /*
  * Copyright 2023 spezifisch <spezifisch23@proton.me> https://github.com/spezifisch
  * Copyright 2020 Ralim, IronOS https://github.com/Ralim/IronOS
- * 
+ *
  * Partly based on IronOS v2.21, GPLv3: https://github.com/Ralim/IronOS/blob/v2.21/LICENSE
  * Original source files:
  * - https://github.com/Ralim/IronOS/blob/v2.21/source/Core/Threads/PIDThread.cpp
@@ -83,11 +83,11 @@ void SolderingTip::setup()
 
 void SolderingTip::setTargetTemperature(uint32_t target_degC)
 {
-    if (target_degC > 450)
+    if (target_degC > MAX_TARGET_TEMPERATURE_degC)
     {
-        target_degC = 450;
+        target_degC = MAX_TARGET_TEMPERATURE_degC;
     }
-    else if (target_degC < 150)
+    else if (target_degC < MIN_TARGET_TEMPERATURE_degC)
     {
         target_degC = 0;
     }
@@ -138,14 +138,14 @@ void SolderingTip::pwmMeasureCallback()
     tipTemp_uV = constrain(tipTemp_raw * 3300 / 4095 * 1000 / 221, 0, 15000); // ... to uV, 221x gain from OpAmp
 
     // convert to °C
-    tipTemp_degC = IronOS::convertuVToDegC(tipTemp_uV); // IronOS curve
-                                                        // tipTemp_degC = (tipTemp_raw * 204 - 73840) / 1000; // custom curve
+    tipTemp_degC = IronOS::convertuVToDegC(tipTemp_uV); // IronOS T12 curve
+
+    // tipTemp_degC = (tipTemp_raw * 204 - 73840) / 1000; // custom curve from manual measurements and linear regression, pretty similar above 250°C
 }
 
 void SolderingTip::pwmPIDControllerCallback()
 {
-    // PID controller or rather I², based on IronOS' PIDThread:
-    // https://github.com/Ralim/IronOS/blob/v2.21/source/Core/Threads/PIDThread.cpp
+    // PID controller based on IronOS' PIDThread
     const uint32_t now = millis();
 
     const uint32_t deltaT_ms = now - lastPIDTime;
@@ -205,10 +205,10 @@ void SolderingTip::pwmPIDControllerCallback()
 
 void SolderingTip::tipOn()
 {
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(TIPHEAT_GPIO, TIPHEAT_PIN_MASK, GPIO_PIN_SET);
 }
 
 void SolderingTip::tipOff()
 {
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(TIPHEAT_GPIO, TIPHEAT_PIN_MASK, GPIO_PIN_RESET);
 }

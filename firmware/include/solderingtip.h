@@ -119,6 +119,10 @@ protected:
     static constexpr uint32_t HARDWARE_MAX_WATTAGE_X10 = 650;
     // default gain in IronOS for 8 Ohm tips
     static constexpr uint32_t TIP_THERMAL_MASS = 65; // X10 watts to raise 1 deg C in 1 second
+    // don't kill the soldering tip
+    static constexpr uint32_t MAX_TARGET_TEMPERATURE_degC = 450;
+    // below this value measurements get *very* unreliable
+    static constexpr uint32_t MIN_TARGET_TEMPERATURE_degC = 150;
 };
 
 extern SolderingTip solderingTip;

@@ -59,7 +59,7 @@ void setup()
     u8g2.firstPage();
     do
     {
-        u8g2.drawButtonUTF8(u8g2.getDisplayWidth() / 2, u8g2.getDisplayHeight() / 2, U8G2_BTN_HCENTER | U8G2_BTN_BW1, 0, 2, 2, "PEN SOLDER V3");
+        u8g2.drawButtonUTF8(u8g2.getDisplayWidth() / 2, u8g2.getDisplayHeight() / 2, U8G2_BTN_HCENTER | U8G2_BTN_BW1, 0, 2, 2, "PEN SOLDER V3 1.0");
         u8g2.drawButtonUTF8(u8g2.getDisplayWidth() / 2, 28, U8G2_BTN_HCENTER, 0, 0, 0, "github.com/spezifisch");
     } while (u8g2.nextPage());
     delay(1000);
