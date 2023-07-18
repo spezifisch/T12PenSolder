@@ -18,5 +18,6 @@ static constexpr int TIPTEMP_MEAS = PA2;
 
 // default settings
 static constexpr uint32_t DEFAULT_TEMPERATURE_degC = 320;
+static constexpr uint32_t DEFAULT_STANDBY_TIME_ms = 60000;
 
 #endif /* CONFIG_H */

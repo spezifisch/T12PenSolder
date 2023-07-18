@@ -64,12 +64,18 @@ void loop(void)
     // runtime settings
     static bool heatOn = false;                                          // soldering tip enabled
     static uint32_t selectedTemperature_degC = DEFAULT_TEMPERATURE_degC; // target temp., change with -/+
+    static uint32_t idle_time_ms = 0;
 
     // 10 Hz UI update
     const uint32_t now = millis();
     if (now - last_millis < UPDATE_PERIOD_ms)
     {
         return;
+    }
+    // update idle time counter
+    if (heatOn && idle_time_ms < DEFAULT_STANDBY_TIME_ms)
+    {
+        idle_time_ms += now - last_millis;
     }
     last_millis = now;
 
@@ -111,9 +117,25 @@ void loop(void)
         buttonPlusDebounce.reset(); // repeat
     }
 
+    // reset idle time on any button press
+    if (buttonSet || buttonMinus || buttonPlus)
+    {
+        idle_time_ms = 0;
+    }
+
+    // turn off tip after standby counter elapsed
+    const bool inStandby = idle_time_ms >= DEFAULT_STANDBY_TIME_ms;
+    if (inStandby)
+    {
+        solderingTip.setTargetTemperature(0);
+        solderingTip.safeMode(); // for good measure
+        heatOn = false;
+    }
+
     // get tip state
     const uint32_t vin_raw = solderingTip.getVinRaw();
-    const uint32_t vin_mv = solderingTip.getVinmV();
+    const uint32_t vin_mv_dec = solderingTip.getVinmV() % 1000;
+    const uint32_t vin_v = solderingTip.getVinmV() / 1000;
 
     const uint32_t tt_raw = solderingTip.getTipTempRaw();
     const uint32_t tt_uv = solderingTip.getTipTempuV();
@@ -122,19 +144,34 @@ void loop(void)
     const int32_t t_pwm = solderingTip.getPWM();
     const int32_t t_outputWatts = solderingTip.getOutputWatts();
 
+    // UI info
+    const uint32_t timestamp = (now % 10000000) / 100;
+    const uint32_t showtime_ms = last_showtime / 1000;
+    uint32_t standby_counter_s = 0;
+    if (DEFAULT_STANDBY_TIME_ms > idle_time_ms)
+    {
+        standby_counter_s = (DEFAULT_STANDBY_TIME_ms - idle_time_ms) / 1000;
+    }
+
     // display output
     u8g2.firstPage();
     do
     {
+        u8g2.setFont(u8g2_font_spleen12x24_mf);
+        u8g2.setCursor(4, 15);
+        snprintf(tmp, sizeof(tmp), "%d", vin_v);
+        u8g2.print(tmp);
+
         u8g2.setFont(u8g2_font_5x8_mr);
 
         // first row
-        u8g2.setCursor(4, 8);
-        snprintf(tmp, sizeof(tmp), "Vin:%04d %5dmV T%07d", vin_raw, vin_mv, now % 10000000);
+        u8g2.setCursor(4, 6);
+        snprintf(tmp, sizeof(tmp), "     A%04d T%05dL%2d %04d", vin_raw, timestamp, showtime_ms, tt_raw);
         u8g2.print(tmp);
 
-        u8g2.setCursor(4, 16);
-        snprintf(tmp, sizeof(tmp), "Tip:%04d %5duV D%2d%%L%2d", tt_raw, tt_uv, t_pwm, last_showtime / 1000);
+        // 2nd row
+        u8g2.setCursor(4, 15);
+        snprintf(tmp, sizeof(tmp), "     .%03dV D%02dS%02d %5duV", vin_mv_dec, t_pwm, standby_counter_s, tt_uv);
         u8g2.print(tmp);
 
         // 3rd row
@@ -153,6 +190,10 @@ void loop(void)
         {
             snprintf(tmp, sizeof(tmp), "%2dW", t_outputWatts);
             u8g2.print(tmp);
+        }
+        else if (inStandby)
+        {
+            u8g2.print("SBY");
         }
         else
         {
