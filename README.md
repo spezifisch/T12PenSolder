@@ -4,11 +4,11 @@
 
 ## Replacement Firmware
 
-Development WIP in [./test_fw](./test_fw).
+Development WIP in [./firmware](./firmware).
 
 ![](./fwdisplay.jpg)
 
-Current state:
+Current state (quite usable!):
 
 * soldering tip temperature PID controller code works (adapted from [IronOS](https://github.com/Ralim/IronOS))
 * temperature measurement synced with off time of tip switching PWM
@@ -17,6 +17,7 @@ Current state:
 * display output works (it's connected to non-hardware-I2C pins, so we're bitbanging with [U8g2](https://github.com/olikraus/u8g2) with custom STM32 optimizations for around 170kHz I2C clock speed)
 * standby after 60s without activity (partly implemented, just turns tip off at the moment)
 * no cold junction compensation (not available on this board)
+* no settings storage
 * resource usage: around 30/32kB flash, 1.4/4kB RAM (we're splurging a bit by including an additional font and Arduino libs)
 
 ## "Pen Solder V3" Description
