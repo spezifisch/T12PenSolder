@@ -1,7 +1,9 @@
 #ifndef IRONOS_PID_H
 #define IRONOS_PID_H
 
-// from IronOS, GPL3: https://github.com/Ralim/IronOS/blob/dev/LICENSE
+// Integrator taken from IronOS 2.21, GPLv3: https://github.com/Ralim/IronOS/blob/v2.21/LICENSE
+// source file: https://github.com/Ralim/IronOS/blob/v2.21/source/Core/Threads/PIDThread.cpp
+
 namespace IronOS
 {
     template <class T = int32_t>

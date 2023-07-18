@@ -1,10 +1,13 @@
-// from IronOS, GPL3: https://github.com/Ralim/IronOS/blob/dev/LICENSE
+// code based on IronOS, v2.21, GPLv3: https://github.com/Ralim/IronOS/blob/v2.21/LICENSE
+// source files:
+// - https://github.com/Ralim/IronOS/blob/v2.21/source/Core/Drivers/Utils.cpp
+// - https://github.com/Ralim/IronOS/blob/v2.21/source/Core/BSP/Pinecilv2/ThermoModel.cpp (Pinecil also uses T12 tips)
 
 #include <inttypes.h>
 
 namespace IronOS
 {
-
+    // Pinecilv2 T12 curve
     static const int32_t uVtoDegC[] = {
         0, 0,       //
         266, 10,    //

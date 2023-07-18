@@ -16,7 +16,7 @@ Current state:
 * voltage measurement of soldering tip temperature and VBUS (from USB-PD) work
 * display output works (it's connected to non-hardware-I2C pins, so we're bitbanging with [U8g2](https://github.com/olikraus/u8g2) with custom STM32 optimizations for around 170kHz I2C clock speed)
 * no cold junction compensation (not available on this board)
-* resource usage: around 28/32kB flash, 1.4/4kB RAM
+* resource usage: around 30/32kB flash, 1.4/4kB RAM (we're splurging a bit by including an additional font and Arduino libs)
 
 ## "Pen Solder V3" Description
 
