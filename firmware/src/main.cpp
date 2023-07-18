@@ -75,7 +75,8 @@ void loop(void)
     static uint32_t last_showtime = 0;                                              // last display buffer transfer duration
 
     // buttons
-    static constexpr uint32_t BUTTON_DEBOUNCE_COUNT = 2; // button state must be stable for this many display updates
+    static constexpr uint32_t BUTTON_TEMPERATURE_STEP_K = 10; // temperature increment on button press
+    static constexpr uint32_t BUTTON_DEBOUNCE_COUNT = 2;      // button state must be stable for this many display updates
     static Debounce<BUTTON_DEBOUNCE_COUNT> buttonSetDebounce, buttonMinusDebounce, buttonPlusDebounce;
 
     // runtime settings
@@ -112,25 +113,31 @@ void loop(void)
 
     if (buttonMinus)
     {
-        selectedTemperature_degC -= 10;
-        if (selectedTemperature_degC < 150)
+        selectedTemperature_degC -= BUTTON_TEMPERATURE_STEP_K;
+        if (selectedTemperature_degC < SolderingTip::MIN_TARGET_TEMPERATURE_degC)
         {
-            selectedTemperature_degC = 150;
+            selectedTemperature_degC = SolderingTip::MIN_TARGET_TEMPERATURE_degC;
+        }
+        if (heatOn)
+        {
+            solderingTip.setTargetTemperature(selectedTemperature_degC);
         }
 
-        solderingTip.setTargetTemperature(heatOn ? selectedTemperature_degC : 0);
         buttonMinusDebounce.reset(); // repeat when holding button
     }
 
     if (buttonPlus)
     {
-        selectedTemperature_degC += 10;
-        if (selectedTemperature_degC > 450)
+        selectedTemperature_degC += BUTTON_TEMPERATURE_STEP_K;
+        if (selectedTemperature_degC > SolderingTip::MAX_TARGET_TEMPERATURE_degC)
         {
-            selectedTemperature_degC = 450;
+            selectedTemperature_degC = SolderingTip::MAX_TARGET_TEMPERATURE_degC;
+        }
+        if (heatOn)
+        {
+            solderingTip.setTargetTemperature(selectedTemperature_degC);
         }
 
-        solderingTip.setTargetTemperature(heatOn ? selectedTemperature_degC : 0);
         buttonPlusDebounce.reset(); // repeat
     }
 
@@ -157,9 +164,10 @@ void loop(void)
     const uint32_t tt_raw = solderingTip.getTipTempRaw();
     const uint32_t tt_uv = solderingTip.getTipTempuV();
     const int32_t tt_degC = solderingTip.getTipTempDegC();
+    const int32_t tt_missing = solderingTip.getTipMissing();
 
     const int32_t t_pwm = solderingTip.getPWM();
-    const int32_t t_outputWatts = solderingTip.getOutputWatts();
+    const int32_t t_output_w = solderingTip.getOutputW();
 
     // UI info
     const uint32_t timestamp = (now % 10000000) / 100;
@@ -174,11 +182,7 @@ void loop(void)
     u8g2.firstPage();
     do
     {
-        u8g2.setFont(u8g2_font_spleen12x24_mf);
-        u8g2.setCursor(4, 15);
-        snprintf(tmp, sizeof(tmp), "%d", vin_v);
-        u8g2.print(tmp);
-
+        // small...
         u8g2.setFont(u8g2_font_5x8_mr);
 
         // first row
@@ -200,12 +204,19 @@ void loop(void)
         snprintf(tmp, sizeof(tmp), "%3dC", selectedTemperature_degC);
         u8g2.print(tmp);
 
-        // big
-        u8g2.setCursor(4, 32);
+        // big...
         u8g2.setFont(u8g2_font_spleen12x24_mf);
+
+        // Vin: xx(V)
+        u8g2.setCursor(4, 15);
+        snprintf(tmp, sizeof(tmp), "%2d", vin_v);
+        u8g2.print(tmp);
+
+        // power: xxW/SBY/OFF
+        u8g2.setCursor(4, 32);
         if (heatOn)
         {
-            snprintf(tmp, sizeof(tmp), "%2dW", t_outputWatts);
+            snprintf(tmp, sizeof(tmp), "%2dW", t_output_w);
             u8g2.print(tmp);
         }
         else if (inStandby)
@@ -217,10 +228,17 @@ void loop(void)
             u8g2.print("OFF");
         }
 
-        //
+        // tip: xxxC/nTIP
         u8g2.setCursor(80, 32);
-        snprintf(tmp, sizeof(tmp), "%3dC", tt_degC);
-        u8g2.print(tmp);
+        if (tt_missing)
+        {
+            u8g2.print("nTIP");
+        }
+        else
+        {
+            snprintf(tmp, sizeof(tmp), "%3dC", tt_degC);
+            u8g2.print(tmp);
+        }
     } while (u8g2.nextPage());
 
     last_showtime = micros() - start;

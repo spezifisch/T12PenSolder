@@ -33,22 +33,26 @@ SolderingTip solderingTip;
 static void Update_IT_callback(void)
 {
     // Update event correspond to Rising edge of PWM when configured in PWM1 mode
+    // timer reset
     solderingTip.pwmUpdateCallback();
 }
 
 static void Switch_callback(void)
 {
     // Compare match event correspond to falling edge of PWM when configured in PWM1 mode
+    // timer channel 1 OC
     solderingTip.pwmSwitchCallback();
 }
 
 static void Measure_callback(void)
 {
+    // timer channel 2 OC
     solderingTip.pwmMeasureCallback();
 }
 
 static void Controller_callback(void)
 {
+    // timer channel 3 OC
     solderingTip.pwmPIDControllerCallback();
 }
 
@@ -56,8 +60,8 @@ void SolderingTip::safeMode()
 {
     tipOff();
     targetTemperature_degC = 0;
-    outputWatts = 0;
-    pwmDutyPercent = 0;
+    output_W = 0;
+    pwmDuty_percent = 0;
     tipOff();
 }
 
@@ -67,17 +71,21 @@ void SolderingTip::setup()
 
     // configure PWM heater output
     TipHeatTimer = new HardwareTimer(TIM3);
-    TipHeatTimer->setOverflow(100000, MICROSEC_FORMAT);              // 100 ms, 10 Hz
+    TipHeatTimer->setOverflow(100000, MICROSEC_FORMAT); // reset every 100 ms, 10 Hz
+
+    // our 3 timer channels
     TipHeatTimer->setMode(THTSwitchChannel, TIMER_DISABLED, -1);     // on compare cb: switch output off
-    TipHeatTimer->setMode(THTMeasureChannel, TIMER_DISABLED, -1);    // measure tip temperature
-    TipHeatTimer->setMode(THTControllerChannel, TIMER_DISABLED, -1); // update PID controller
+    TipHeatTimer->setMode(THTMeasureChannel, TIMER_DISABLED, -1);    // on cb: measure tip temperature
+    TipHeatTimer->setMode(THTControllerChannel, TIMER_DISABLED, -1); // on cb: update PID controller
     TipHeatTimer->setCaptureCompare(THTSwitchChannel, 0, PERCENT_COMPARE_FORMAT);
     TipHeatTimer->setCaptureCompare(THTMeasureChannel, 10, PERCENT_COMPARE_FORMAT);    // switch% + 10%
-    TipHeatTimer->setCaptureCompare(THTControllerChannel, 95, PERCENT_COMPARE_FORMAT); // always after 95ms
+    TipHeatTimer->setCaptureCompare(THTControllerChannel, 95, PERCENT_COMPARE_FORMAT); // always after 95ms (5ms should be more than enough time for PID update)
+
     TipHeatTimer->attachInterrupt(Update_IT_callback);
     TipHeatTimer->attachInterrupt(THTSwitchChannel, Switch_callback);
     TipHeatTimer->attachInterrupt(THTMeasureChannel, Measure_callback);
     TipHeatTimer->attachInterrupt(THTControllerChannel, Controller_callback);
+
     TipHeatTimer->resume();
 }
 
@@ -99,25 +107,23 @@ void SolderingTip::setTargetTemperature(uint32_t target_degC)
 void SolderingTip::pwmUpdateCallback()
 {
     const bool turnedOn = targetTemperature_degC > 0;
-    const bool dutyCycleSanity = pwmDutyPercent >= 0 && pwmDutyPercent <= MAX_DUTY_PERCENT;
-    // IronOS: Secondary safety check to forcefully disable header when within ADC noise of top of ADC
-    const bool adcLimitReached = getTipTempRaw() > (0x7FFF - 32);
+    const bool dutyCycleSanity = pwmDuty_percent >= 0 && pwmDuty_percent <= MAX_DUTY_PERCENT;
 
-    if (turnedOn && dutyCycleSanity && !adcLimitReached)
+    if (turnedOn && dutyCycleSanity && !tipTemp_adcLimitReached)
     {
         pidRunning = true;
-        if (pwmDutyPercent > 0)
+        if (pwmDuty_percent > 0)
         {
             tipOn();
         }
-        TipHeatTimer->setCaptureCompare(THTSwitchChannel, pwmDutyPercent, PERCENT_COMPARE_FORMAT);
-        TipHeatTimer->setCaptureCompare(THTMeasureChannel, pwmDutyPercent + 10, PERCENT_COMPARE_FORMAT);
+        TipHeatTimer->setCaptureCompare(THTSwitchChannel, pwmDuty_percent, PERCENT_COMPARE_FORMAT);
+        TipHeatTimer->setCaptureCompare(THTMeasureChannel, pwmDuty_percent + 10, PERCENT_COMPARE_FORMAT);
     }
     else
     {
         pidRunning = false;
-        pwmDutyPercent = 0;
-        outputWatts = 0;
+        pwmDuty_percent = 0;
+        output_W = 0;
         tipOff();
     }
 }
@@ -141,6 +147,9 @@ void SolderingTip::pwmMeasureCallback()
     tipTemp_degC = IronOS::convertuVToDegC(tipTemp_uV); // IronOS T12 curve
 
     // tipTemp_degC = (tipTemp_raw * 204 - 73840) / 1000; // custom curve from manual measurements and linear regression, pretty similar above 250°C
+
+    // IronOS: Secondary safety check to forcefully disable header when within ADC noise of top of ADC
+    tipTemp_adcLimitReached = tipTemp_raw >= 4095 - 32;
 }
 
 void SolderingTip::pwmPIDControllerCallback()
@@ -190,16 +199,16 @@ void SolderingTip::pwmPIDControllerCallback()
         // sanity check: don't exceed it because we need time for measurement
         newDuty = constrain(newDuty, 0, MAX_DUTY_PERCENT);
         // this is our output. it gets applied in the next pwmUpdateCallback() call.
-        pwmDutyPercent = newDuty;
+        pwmDuty_percent = newDuty;
 
         // for display
-        outputWatts = (pwmDutyPercent * availableWattsX10) / MAX_DUTY_PERCENT / 10;
+        output_W = (pwmDuty_percent * availableWattsX10) / MAX_DUTY_PERCENT / 10;
     }
     else
     {
         // we're too hot
-        pwmDutyPercent = 0;
-        outputWatts = 0;
+        pwmDuty_percent = 0;
+        output_W = 0;
     }
 }
 
