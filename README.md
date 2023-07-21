@@ -36,7 +36,27 @@ Which leads to this [Reverse Engineered Schematic](./pen_solder_v3.pdf) (click f
 
 [![](pen_solder_v3_sch_preview.png)](./pen_solder_v3.pdf)
 
-## Board Info
+## Flashing
+
+Some test pads are labeled on the board: VSS, CLK, DAT, VDD:
+
+![](./swd.jpg)
+
+Connect them to GND, SWCLK, and SWDIO from your STLink adapter respectively. Do not connect VDD. It's cleaner to supply the board in a more stable manner using an USB-C supply instead.
+
+You can then build and flash my firmware from within VSCode using [PlatformIO](https://docs.platformio.org/en/latest/platforms/ststm32.html) (just press Build/Upload).
+
+### Dumping Stock Firmware
+
+Before flashing a custom image you should backup the stock firmware!
+
+I used the Debian 12 package of [st-tools](https://github.com/stlink-org/stlink) for this:
+
+```
+st-flash --hot-plug read t12-f0.bin 0x8000000 32768
+```
+
+## Hardware Details
 
 Label on case: T12
 
@@ -49,6 +69,17 @@ PEN-SOLDER V3 2023-02-02
 MCU: CHIPSEA F030F6P6
 * https://www.st.com/resource/en/datasheet/stm32f030f4.pdf
 * https://www.st.com/resource/en/reference_manual/rm0360-stm32f030x4x6x8xc-and-stm32f070x6xb-advanced-armbased-32bit-mcus-stmicroelectronics.pdf
+
+```console
+$ st-info --probe 
+Found 1 stlink programmers
+  version:    V2J34S7
+  serial:     ...
+  flash:      32768 (pagesize: 1024)
+  sram:       8192
+  chipid:     0x0440
+  descr:      F0xx
+```
 
 Big P-MOSFET: NCE30P30K
 * https://datasheet.lcsc.com/szlcsc/NCE30P30K_C130106.pdf
@@ -69,23 +100,6 @@ USB: CH224K
 * https://datasheet.lcsc.com/lcsc/2204251615_WCH-Jiangsu-Qin-Heng-CH224K_C970725.pdf
 * https://www.laskakit.cz/user/related_files/ch224ds1.pdf
 * https://components101.com/ics/ch224k-usb-power-delivery-controller-ic
-
-```console
-$ st-info --probe 
-Found 1 stlink programmers
-  version:    V2J34S7
-  serial:     ...
-  flash:      32768 (pagesize: 1024)
-  sram:       8192
-  chipid:     0x0440
-  descr:      F0xx
-```
-
-## Dumping Stock Firmware
-
-```
-st-flash --hot-plug read t12-f0.bin 0x8000000 32768
-```
 
 ## "STM"32F030 Pinout
 
@@ -109,15 +123,12 @@ st-flash --hot-plug read t12-f0.bin 0x8000000 32768
 CFG1,2,3 pins are not connected to anything. Floating CFG1 means it will request VBUS=20V from USB power supply.
 That's a bit concerning given that this means the P-MOSFET gets U_GS=20V (or more) and that's already its U_GSmax.
 
-Too bad those pins aren't connected to the uC.
+Too bad those pins aren't connected to the uC or we could switch to a lower USB voltage.
 
 ## OpAmp
 
 * Used as non-inverting amplifier, 221x gain
-* Output connected to PA2 through passive low-pass (I wonder how well it works with the long line between R and C)
 * Input connected to T12 soldering tip pin A (the last ring), (tip pin B (the ring between A and Earth) is connected to GND)
 * Zener diode clamps input to 3.3V max.
 * Input range should be 14.9 mV max. assuming the output is 3.3V max.
-* I wonder how noisy the temperature measurement is
-
 
