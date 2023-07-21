@@ -32,7 +32,9 @@ Tracing the board layout:
 
 ![](./layout.jpg)
 
-Which leads to: [Reverse Engineered Schematic](./pen_solder_v3.pdf)
+Which leads to this [Reverse Engineered Schematic](./pen_solder_v3.pdf) (click for PDF):
+
+[![](pen_solder_v3_sch_preview.png)](./pen_solder_v3.pdf)
 
 ## Board Info
 
