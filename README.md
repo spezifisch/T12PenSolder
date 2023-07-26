@@ -1,6 +1,11 @@
-# T12 clone reverse engineering and replacement firmware
+# Pen Solder V3 (PSV3) replacement firmware
 
-"I should have just bought a [Pinecil](https://wiki.pine64.org/wiki/Pinecil)."
+Cheap soldering iron reverse engineering and replacement firmware.
+
+See also the [write-up on my blog](https://spezifisch.codeberg.page/tags/soldering-iron/).
+
+**Note** that I while the product is advertised as a *T12 soldering iron* this is just the name of its ubiquitous soldering tip (*Hakko T12*).
+So I needed a more specific name for it and chose the label on its PCB: Pen Solder V3 or short: PSV3.
 
 ## Replacement Firmware
 
@@ -22,11 +27,9 @@ Current state (quite usable!):
 
 ## "Pen Solder V3" Description
 
-Its name is: *Portable T12 Electric Soldering Iron PD 65W DC 72W*. (T12 is just the name of this ubiquitous soldering tip though. Therefore I'm calling it by the label on its PCB.)
+Its name is: *Portable T12 Electric Soldering Iron PD 65W DC 72W*.
 
 ![](./ali_product.jpg)
-
-I [expected an STC8 uC](https://github.com/atc1441/ATC_stc_solder_iron) but got an STM32F030 clone instead. Which is arguably better.
 
 Tracing the board layout:
 
