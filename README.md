@@ -24,6 +24,7 @@ Current state (quite usable!):
 * no cold junction compensation (not available on this board)
 * no settings storage
 * resource usage: around 30/32kB flash, 1.4/4kB RAM (we're splurging a bit by including an additional font and Arduino libs)
+* supported boards: V3, V7
 
 ## "Pen Solder V3" Description
 
@@ -38,6 +39,22 @@ Tracing the board layout:
 Which leads to this [Reverse Engineered Schematic](./pen_solder_v3.pdf) (click for PDF):
 
 [![](pen_solder_v3_sch_preview.png)](./pen_solder_v3.pdf)
+
+## "Pen Solder V7"
+
+To compile for V7 boards open `./firmware/platformio.ini` and change the following line:
+
+```ini
+-D PENSOLDER_V=3
+```
+
+to
+
+```ini
+-D PENSOLDER_V=7
+```
+
+Thanks to @Gobracket for finding the needed change in the display's setup!
 
 ## Flashing
 

@@ -54,6 +54,11 @@ void setup()
     // display setup
     u8g2.begin();
 
+    // V7 needs different display settings, see https://github.com/spezifisch/T12PenSolder/issues/1
+#if PENSOLDER_V == 7
+    u8g2.sendF("ca", 0x0a8, 0x02f);
+#endif
+
     // splash screen
     u8g2.setFont(u8g2_font_5x8_mr);
     u8g2.firstPage();
