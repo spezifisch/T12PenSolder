@@ -37,7 +37,7 @@ static constexpr int TIPTEMP_MEAS = PA2;
 
 // default settings
 static constexpr uint32_t DEFAULT_TEMPERATURE_degC = 320;
-static constexpr uint32_t DEFAULT_STANDBY_TIME_ms = 60000;
+static constexpr uint32_t DEFAULT_STANDBY_TIME_ms = 600000;
 
 // NOTE there are also some soldering tip related constants in ./solderingtip.h
 

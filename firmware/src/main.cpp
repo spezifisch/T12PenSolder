@@ -64,7 +64,7 @@ void setup()
     u8g2.firstPage();
     do
     {
-        u8g2.drawButtonUTF8(u8g2.getDisplayWidth() / 2, u8g2.getDisplayHeight() / 2, U8G2_BTN_HCENTER | U8G2_BTN_BW1, 0, 2, 2, "PEN SOLDER V3 1.0");
+        u8g2.drawButtonUTF8(u8g2.getDisplayWidth() / 2, u8g2.getDisplayHeight() / 2, U8G2_BTN_HCENTER | U8G2_BTN_BW1, 0, 2, 2, "T12PenSolder 1.0");
         u8g2.drawButtonUTF8(u8g2.getDisplayWidth() / 2, 28, U8G2_BTN_HCENTER, 0, 0, 0, "github.com/spezifisch");
     } while (u8g2.nextPage());
     delay(1000);
@@ -197,7 +197,7 @@ void loop(void)
 
         // 2nd row
         u8g2.setCursor(4, 15);
-        snprintf(tmp, sizeof(tmp), "     .%03dV D%02dS%02d %5duV", vin_mv_dec, t_pwm, standby_counter_s, tt_uv);
+        snprintf(tmp, sizeof(tmp), "     .%03dV %5ds %5duV", vin_mv_dec, standby_counter_s, tt_uv);
         u8g2.print(tmp);
 
         // 3rd row
